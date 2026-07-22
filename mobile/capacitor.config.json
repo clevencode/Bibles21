@@ -1,0 +1,16 @@
+{
+  "appId": "com.clevenrec.bibles21",
+  "appName": "Bible S21",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": false
+    }
+  }
+}

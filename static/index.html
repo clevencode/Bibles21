@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f0e8" />
+  <title>Bible Segond 21 — local</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="site-header">
+      <p class="eyebrow">Lecture locale · hors-ligne</p>
+      <h1 class="site-title">Bible Segond 21</h1>
+    </header>
+
+    <section class="nav-bar" aria-label="Navigation">
+      <div class="nav-grid">
+        <label class="field">
+          <span>Testament</span>
+          <select id="sel-testamento" autocomplete="off"></select>
+        </label>
+        <label class="field">
+          <span>Livre</span>
+          <select id="sel-livro" autocomplete="off"></select>
+        </label>
+        <label class="field">
+          <span>Chapitre</span>
+          <select id="sel-capitulo" autocomplete="off"></select>
+        </label>
+        <label class="field">
+          <span>Verset</span>
+          <select id="sel-versiculo" autocomplete="off"></select>
+        </label>
+      </div>
+    </section>
+
+    <section class="search-block" aria-label="Recherche">
+      <form id="form-busca" class="search-form" role="search">
+        <label class="sr-only" for="q">Recherche</label>
+        <div class="search-field">
+          <input
+            id="q"
+            type="search"
+            placeholder="Jean 3:16 ou un mot…"
+            autocomplete="off"
+            enterkeyhint="search"
+            spellcheck="true"
+            aria-controls="search-panel"
+            aria-describedby="search-hint"
+          />
+          <button type="button" id="btn-clear-search" class="search-clear" hidden aria-label="Effacer">
+            ×
+          </button>
+        </div>
+        <button type="submit" id="btn-search">Chercher</button>
+      </form>
+      <p id="search-hint" class="search-hint">Référence ou texte (≥ 2 lettres).</p>
+      <div id="search-panel" class="search-panel" hidden>
+        <div class="search-meta">
+          <p id="search-meta" class="search-meta-text" aria-live="polite"></p>
+          <button type="button" id="btn-close-results" class="linkish">Fermer</button>
+        </div>
+        <ul id="resultados" role="listbox" aria-label="Résultats"></ul>
+      </div>
+    </section>
+
+    <section class="reader" aria-label="Lecture" aria-busy="false">
+      <div class="reader-toolbar">
+        <button type="button" id="btn-prev" class="nav-btn" aria-label="Chapitre précédent">‹</button>
+        <h2 id="titulo-cap" class="chapter-title"></h2>
+        <button type="button" id="btn-next" class="nav-btn" aria-label="Chapitre suivant">›</button>
+      </div>
+      <div id="versiculos" class="verse-list"></div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

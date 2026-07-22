@@ -1,0 +1,53 @@
+{
+  "version": "S21",
+  "note": "Fixture mínima para desenvolvimento — não é o corpus completo (© Société Biblique de Genève).",
+  "books": [
+    {
+      "testamento": "AT",
+      "livro": "Genèse",
+      "livro_osis": "Gen",
+      "chapters": [
+        {
+          "capitulo": 1,
+          "verses": [
+            {"versiculo": 1, "texto": "Au commencement, Dieu créa le ciel et la terre."},
+            {"versiculo": 2, "texto": "La terre était informe et vide; il y avait des ténèbres à la surface de l'abîme, et l'Esprit de Dieu planait au-dessus de l'eau."},
+            {"versiculo": 3, "texto": "Dieu dit: «Qu'il y ait de la lumière!» et il y eut de la lumière."},
+            {"versiculo": 4, "texto": "Dieu vit que la lumière était bonne et il sépara la lumière d'avec les ténèbres."},
+            {"versiculo": 5, "texto": "Dieu appela la lumière jour, et il appela les ténèbres nuit. Il y eut un soir et il y eut un matin. Ce fut le premier jour."}
+          ]
+        }
+      ]
+    },
+    {
+      "testamento": "AT",
+      "livro": "Daniel",
+      "livro_osis": "Dan",
+      "chapters": [
+        {
+          "capitulo": 12,
+          "verses": [
+            {"versiculo": 1, "texto": "A cette époque-là se lèvera Michel, le grand chef, celui qui veille sur les enfants de ton peuple. Ce sera une période de détresse telle qu'il n'y en aura pas eu de semblable depuis que les nations existent jusqu'à cette époque-là. Alors ceux de ton peuple qu'on trouvera inscrits dans le livre seront sauvés."},
+            {"versiculo": 2, "texto": "Beaucoup de ceux qui dorment dans la poussière de la terre se réveilleront, les uns pour la vie éternelle, les autres pour la honte, pour l'horreur éternelle."},
+            {"versiculo": 3, "texto": "Ceux qui auront été intelligents brilleront comme la splendeur du ciel, et ceux qui auront enseigné la justice à beaucoup brilleront comme les étoiles, pour toujours et à perpétuité."},
+            {"versiculo": 4, "texto": "Quant à toi, Daniel, tiens ces paroles cachées et marque le livre du sceau du secret jusqu'au moment de la fin! Beaucoup seront perplexes, mais la connaissance augmentera.»"}
+          ]
+        }
+      ]
+    },
+    {
+      "testamento": "NT",
+      "livro": "Jean",
+      "livro_osis": "John",
+      "chapters": [
+        {
+          "capitulo": 3,
+          "verses": [
+            {"versiculo": 16, "texto": "En effet, Dieu a tant aimé le monde qu'il a donné son Fils unique afin que quiconque croit en lui ne périsse pas mais ait la vie éternelle."},
+            {"versiculo": 17, "texto": "Dieu, en effet, n'a pas envoyé son Fils dans le monde pour juger le monde, mais pour que le monde soit sauvé par lui."}
+          ]
+        }
+      ]
+    }
+  ]
+}
