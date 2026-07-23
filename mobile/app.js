@@ -9,6 +9,7 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   const titulo = $("titulo-cap");
   const box = $("versiculos");
   const status = $("status");
+  const refLabel = $("ref-label");
   const resultados = $("resultados");
   const form = $("form-busca");
   const qInput = $("q");
@@ -21,6 +22,14 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   const btnPrev = $("btn-prev");
   const btnNext = $("btn-next");
   const reader = document.querySelector(".reader");
+  const sheetPicker = $("sheet-picker");
+  const sheetVerses = $("sheet-verses");
+  const sheetSearch = $("sheet-search");
+  const bookList = $("book-list");
+  const chapterGrid = $("chapter-grid");
+  const verseGrid = $("verse-grid");
+  const paneBooks = $("pane-books");
+  const paneChapters = $("pane-chapters");
 
   const MIN_Q = 2;
   const DEBOUNCE_MS = 360;
@@ -32,6 +41,7 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   let currentOsis = "";
   let currentLivro = "";
   let currentCap = 0;
+  let pickerTestament = "AT";
   let searchSeq = 0;
   let loadSeq = 0;
   let debounceTimer = null;
@@ -57,30 +67,53 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   function setReading(busy) {
     reader?.setAttribute("aria-busy", busy ? "true" : "false");
     reader?.classList.toggle("is-loading", busy);
-    [selT, selL, selC, selV, btnPrev, btnNext].forEach((el) => {
-      if (el) el.disabled = busy;
+    [btnPrev, btnNext].forEach((el) => {
+      if (el) el.disabled = busy ? el.disabled : el.disabled;
     });
+  }
+
+  function syncSheetOpenClass() {
+    const open =
+      !sheetPicker.hidden || !sheetVerses.hidden || !sheetSearch.hidden;
+    document.body.classList.toggle("sheet-open", open);
+  }
+
+  function openSheet(el) {
+    el.hidden = false;
+    syncSheetOpenClass();
+  }
+
+  function closeSheet(el) {
+    el.hidden = true;
+    syncSheetOpenClass();
+  }
+
+  function closeAllSheets() {
+    closeSheet(sheetPicker);
+    closeSheet(sheetVerses);
+    closeSheet(sheetSearch);
   }
 
   function savePosition(ver) {
     try {
-      const payload = {
-        osis: currentOsis,
-        livro: currentLivro,
-        cap: currentCap,
-        ver: ver ? Number(ver) : null,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          osis: currentOsis,
+          livro: currentLivro,
+          cap: currentCap,
+          ver: ver ? Number(ver) : null,
+        })
+      );
     } catch {
-      /* ignore quota / private mode */
+      /* private mode */
     }
   }
 
   function readSavedPosition() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
+      return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
@@ -90,15 +123,21 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
     return books.findIndex((b) => b.livro === livro);
   }
 
+  function updateRefLabel() {
+    const livro = selL.value || "…";
+    const cap = selC.value || "";
+    const text = cap ? `${livro} ${cap}` : livro;
+    refLabel.textContent = text;
+    titulo.textContent = text;
+  }
+
   function fillTestamentos(prefer) {
     const set = [...new Set(books.map((b) => b.testamento))];
     selT.innerHTML = set
-      .map(
-        (t) =>
-          `<option value="${t}">${t === "AT" ? "Ancien Testament" : "Nouveau Testament"}</option>`
-      )
+      .map((t) => `<option value="${t}">${t}</option>`)
       .join("");
     if (prefer && set.includes(prefer)) selT.value = prefer;
+    pickerTestament = selT.value || "AT";
   }
 
   function fillLivros(preferLivro) {
@@ -114,6 +153,7 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
       selL.value = preferLivro;
     }
     fillCapitulos();
+    renderBookList();
   }
 
   function fillCapitulos(preferCap) {
@@ -127,6 +167,8 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
       selC.value = String(preferCap);
     }
     fillVersiculos([]);
+    renderChapterGrid();
+    updateRefLabel();
   }
 
   function fillVersiculos(verses, prefer) {
@@ -146,6 +188,60 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
     } else {
       selV.value = "";
     }
+    renderVerseGrid();
+  }
+
+  function renderBookList() {
+    const list = books.filter((b) => b.testamento === pickerTestament);
+    bookList.innerHTML = list
+      .map((b) => {
+        const cur = b.livro === selL.value ? " is-current" : "";
+        return `<button type="button" class="book-item${cur}" data-livro="${escapeHtml(b.livro)}" data-test="${b.testamento}"><span>${escapeHtml(b.livro)}</span><span class="meta">${b.n_capitulos} ch.</span></button>`;
+      })
+      .join("");
+  }
+
+  function renderChapterGrid() {
+    const opt = selL.selectedOptions[0];
+    const n = opt ? Number(opt.dataset.caps || 1) : 1;
+    const cur = Number(selC.value) || 1;
+    chapterGrid.innerHTML = Array.from({ length: n }, (_, i) => {
+      const c = i + 1;
+      const on = c === cur ? " is-current" : "";
+      return `<button type="button" class="num-cell${on}" data-cap="${c}">${c}</button>`;
+    }).join("");
+  }
+
+  function renderVerseGrid() {
+    const cur = selV.value;
+    verseGrid.innerHTML = currentVerses
+      .map((v) => {
+        const on = String(v.versiculo) === String(cur) ? " is-current" : "";
+        return `<button type="button" class="num-cell${on}" data-ver="${v.versiculo}">${v.versiculo}</button>`;
+      })
+      .join("");
+  }
+
+  function setPickerTab(name) {
+    document.querySelectorAll(".tab").forEach((t) => {
+      const on = t.dataset.tab === name;
+      t.classList.toggle("is-active", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    paneBooks.hidden = name !== "books";
+    paneChapters.hidden = name !== "chapters";
+    $("picker-title").textContent = name === "books" ? "Livres" : "Chapitres";
+  }
+
+  function openPicker(tab = "books") {
+    pickerTestament = selT.value || "AT";
+    document.querySelectorAll(".t-tab").forEach((t) => {
+      t.classList.toggle("is-active", t.dataset.test === pickerTestament);
+    });
+    renderBookList();
+    renderChapterGrid();
+    setPickerTab(tab);
+    openSheet(sheetPicker);
   }
 
   function updateChapterButtons() {
@@ -166,9 +262,7 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   function setHash(osis, cap, ver) {
     if (suppressHash) return;
     const next = ver ? `#${osis}.${cap}.${ver}` : `#${osis}.${cap}`;
-    if (location.hash !== next) {
-      history.replaceState(null, "", next);
-    }
+    if (location.hash !== next) history.replaceState(null, "", next);
   }
 
   function goToVerse(ver, { scroll = true, updateHash = true } = {}) {
@@ -178,18 +272,18 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
         setHash(currentOsis, currentCap, null);
       }
       savePosition(null);
+      renderVerseGrid();
       return;
     }
     const el = document.getElementById(`v-${ver}`);
     if (!el) return;
     el.classList.add("is-active");
-    if (scroll) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    if (scroll) el.scrollIntoView({ behavior: "smooth", block: "center" });
     if (updateHash && currentOsis && currentCap) {
       setHash(currentOsis, currentCap, ver);
     }
     savePosition(ver);
+    renderVerseGrid();
   }
 
   async function loadCapitulo(preferVerse, { scrollTop = true } = {}) {
@@ -198,8 +292,10 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
     if (!livro || !capitulo) return;
 
     const seq = ++loadSeq;
-    setReading(true);
+    reader?.classList.add("is-loading");
+    reader?.setAttribute("aria-busy", "true");
     status.textContent = "Chargement…";
+    updateRefLabel();
     updateChapterButtons();
 
     try {
@@ -210,7 +306,7 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
       currentLivro = data.livro;
       currentCap = data.capitulo;
 
-      titulo.textContent = `${data.livro} ${data.capitulo}`;
+      updateRefLabel();
       box.innerHTML = data.versiculos
         .map(
           (v) =>
@@ -222,7 +318,6 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
       updateChapterButtons();
 
       if (preferVerse) {
-        // attendre layout
         requestAnimationFrame(() =>
           goToVerse(preferVerse, { scroll: true, updateHash: true })
         );
@@ -240,7 +335,10 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
       currentLivro = "";
       currentCap = 0;
     } finally {
-      if (seq === loadSeq) setReading(false);
+      if (seq === loadSeq) {
+        reader?.classList.remove("is-loading");
+        reader?.setAttribute("aria-busy", "false");
+      }
     }
   }
 
@@ -256,11 +354,9 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   async function stepChapter(delta) {
     const idx = bookIndex(selL.value);
     if (idx < 0) return;
-    let cap = Number(selC.value) || 1;
     let nextIdx = idx;
-    let nextCap = cap + delta;
-    const book = books[idx];
-    const maxCap = Number(book.n_capitulos);
+    let nextCap = (Number(selC.value) || 1) + delta;
+    const maxCap = Number(books[idx].n_capitulos);
 
     if (nextCap < 1) {
       if (idx === 0) return;
@@ -279,7 +375,6 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
     await loadCapitulo(undefined, { scrollTop: true });
   }
 
-  /** Jean 3:16 / Dan.12.4 / 1 Jean 2:1 */
   function parseReference(raw) {
     const q = raw.trim();
     if (!q) return null;
@@ -306,7 +401,6 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
     const name = norm(m[1]);
     const cap = Number(m[2]);
     const ver = m[3] ? Number(m[3]) : null;
-
     const book =
       books.find((b) => norm(b.livro) === name) ||
       books.find((b) => norm(b.livro_osis) === name) ||
@@ -337,41 +431,34 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
     btnClear.hidden = !qInput.value.trim();
   }
 
-  function closeSearchPanel() {
+  function closeSearchResults() {
     searchPanel.hidden = true;
     resultados.innerHTML = "";
     searchMeta.textContent = "";
   }
 
-  function openSearchPanel() {
-    searchPanel.hidden = false;
-  }
-
   function setSearching(on) {
     btnSearch.disabled = on;
-    btnSearch.textContent = on ? "…" : "Chercher";
-    qInput.setAttribute("aria-busy", on ? "true" : "false");
+    btnSearch.textContent = on ? "…" : "OK";
   }
 
   function renderResults(q, data) {
     const list = data.results || [];
-    openSearchPanel();
+    searchPanel.hidden = false;
     if (!list.length) {
       searchMeta.textContent = `Aucun résultat pour « ${q} »`;
       resultados.innerHTML =
-        "<li class='muted'>Essayez un autre mot ou une référence (ex. Jean 3:16).</li>";
+        "<li class='muted'>Essayez un autre mot ou Jean 3:16.</li>";
       return;
     }
-    const truncated = list.length >= SEARCH_LIMIT;
-    searchMeta.textContent = truncated
-      ? `${list.length}+ résultats`
-      : `${list.length} résultat${list.length > 1 ? "s" : ""}`;
-
+    searchMeta.textContent =
+      list.length >= SEARCH_LIMIT
+        ? `${list.length}+ résultats`
+        : `${list.length} résultat${list.length > 1 ? "s" : ""}`;
     resultados.innerHTML = list
       .map((r) => {
         const snippet = highlightSnippet(r.texto.slice(0, 140), q);
-        const label = `${escapeHtml(r.livro)} ${r.capitulo}:${r.versiculo}`;
-        return `<li role="option"><button type="button" class="result-item" data-livro="${escapeHtml(r.livro)}" data-cap="${r.capitulo}" data-ver="${r.versiculo}"><span class="result-ref">${label}</span><span class="result-snip">${snippet}${r.texto.length > 140 ? "…" : ""}</span></button></li>`;
+        return `<li role="option"><button type="button" class="result-item" data-livro="${escapeHtml(r.livro)}" data-cap="${r.capitulo}" data-ver="${r.versiculo}"><span class="result-ref">${escapeHtml(r.livro)} ${r.capitulo}:${r.versiculo}</span><span class="result-snip">${snippet}${r.texto.length > 140 ? "…" : ""}</span></button></li>`;
       })
       .join("");
   }
@@ -379,7 +466,7 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   async function runTextSearch(q) {
     const seq = ++searchSeq;
     setSearching(true);
-    openSearchPanel();
+    searchPanel.hidden = false;
     searchMeta.textContent = "Recherche…";
     resultados.innerHTML = "<li class='muted'>…</li>";
     try {
@@ -388,7 +475,6 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
       renderResults(q, data);
     } catch (e) {
       if (seq !== searchSeq) return;
-      openSearchPanel();
       searchMeta.textContent = "Erreur";
       resultados.innerHTML = `<li class="error">${escapeHtml(e.message || e)}</li>`;
     } finally {
@@ -399,9 +485,8 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
   async function runSearch({ fromSubmit = false } = {}) {
     const q = qInput.value.trim();
     setClearVisible();
-
     if (!q) {
-      closeSearchPanel();
+      closeSearchResults();
       searchHint.textContent = "Référence ou texte (≥ 2 lettres).";
       return;
     }
@@ -412,18 +497,18 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
         ? `Référence : ${ref.book.livro} ${ref.cap}:${ref.ver}`
         : `Référence : ${ref.book.livro} ${ref.cap}`;
       if (fromSubmit || ref.kind === "osis" || ref.ver != null) {
-        closeSearchPanel();
+        closeAllSheets();
         await gotoRef(ref.book.livro, ref.cap, ref.ver);
         return;
       }
       if (!fromSubmit) return;
-      closeSearchPanel();
+      closeAllSheets();
       await gotoRef(ref.book.livro, ref.cap, null);
       return;
     }
 
     if (q.length < MIN_Q) {
-      closeSearchPanel();
+      closeSearchResults();
       searchHint.textContent = `Encore ${MIN_Q - q.length} caractère(s)…`;
       return;
     }
@@ -465,20 +550,63 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
       fillTestamentos();
       fillLivros();
 
-      selT.addEventListener("change", () => {
-        fillLivros();
-        loadCapitulo(undefined, { scrollTop: true });
+      $("btn-ref").addEventListener("click", () => openPicker("books"));
+      $("btn-open-search").addEventListener("click", () => {
+        openSheet(sheetSearch);
+        qInput.focus();
       });
-      selL.addEventListener("change", () => {
-        fillCapitulos();
-        loadCapitulo(undefined, { scrollTop: true });
+      $("btn-open-verses").addEventListener("click", () => {
+        renderVerseGrid();
+        openSheet(sheetVerses);
       });
-      selC.addEventListener("change", () =>
-        loadCapitulo(undefined, { scrollTop: true })
-      );
-      selV.addEventListener("change", () => {
-        const ver = selV.value;
-        goToVerse(ver || null, { scroll: Boolean(ver), updateHash: true });
+
+      document.querySelectorAll("[data-close]").forEach((el) => {
+        el.addEventListener("click", () => {
+          const which = el.getAttribute("data-close");
+          if (which === "picker") closeSheet(sheetPicker);
+          if (which === "verses") closeSheet(sheetVerses);
+          if (which === "search") closeSheet(sheetSearch);
+        });
+      });
+
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => setPickerTab(tab.dataset.tab));
+      });
+
+      document.querySelectorAll(".t-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          pickerTestament = tab.dataset.test;
+          document.querySelectorAll(".t-tab").forEach((t) => {
+            t.classList.toggle("is-active", t.dataset.test === pickerTestament);
+          });
+          renderBookList();
+        });
+      });
+
+      bookList.addEventListener("click", (e) => {
+        const btn = e.target.closest(".book-item");
+        if (!btn) return;
+        fillTestamentos(btn.dataset.test);
+        fillLivros(btn.dataset.livro);
+        setPickerTab("chapters");
+        renderChapterGrid();
+      });
+
+      chapterGrid.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".num-cell");
+        if (!btn) return;
+        selC.value = btn.dataset.cap;
+        updateRefLabel();
+        closeSheet(sheetPicker);
+        await loadCapitulo(undefined, { scrollTop: true });
+      });
+
+      verseGrid.addEventListener("click", (e) => {
+        const btn = e.target.closest(".num-cell");
+        if (!btn) return;
+        selV.value = btn.dataset.ver;
+        closeSheet(sheetVerses);
+        goToVerse(btn.dataset.ver);
       });
 
       btnPrev.addEventListener("click", () => stepChapter(-1));
@@ -509,32 +637,28 @@ import { livros as apiLivros, capitulo as apiCapitulo, buscar as apiBuscar } fro
         scheduleSearch();
       });
       qInput.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          closeSearchPanel();
-          qInput.blur();
-        }
+        if (e.key === "Escape") closeSheet(sheetSearch);
       });
       btnClear.addEventListener("click", () => {
         qInput.value = "";
         setClearVisible();
-        closeSearchPanel();
-        searchHint.textContent = "Référence ou texte (≥ 2 lettres).";
+        closeSearchResults();
         qInput.focus();
       });
-      btnCloseResults.addEventListener("click", closeSearchPanel);
+      btnCloseResults.addEventListener("click", closeSearchResults);
       resultados.addEventListener("click", async (e) => {
         const btn = e.target.closest(".result-item");
         if (!btn) return;
-        closeSearchPanel();
+        closeAllSheets();
         await gotoRef(btn.dataset.livro, btn.dataset.cap, btn.dataset.ver);
       });
 
-      window.addEventListener("hashchange", () => {
-        applyHash();
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeAllSheets();
       });
 
-      // prioridade: hash URL > dernière position > Genèse 1
+      window.addEventListener("hashchange", () => applyHash());
+
       if (applyHash()) return;
 
       const saved = readSavedPosition();

@@ -5,6 +5,7 @@ venv/
 .env
 data/raw/*.json
 data/raw/*.txt
+data/raw/epub_extract/
 !data/raw/.gitkeep
 data/*.db
 data/*.db-journal

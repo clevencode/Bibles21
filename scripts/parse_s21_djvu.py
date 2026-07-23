@@ -109,21 +109,62 @@ BOOKS: list[dict] = [
     {"livro": "1 Timothée", "osis": "1Tim", "t": "NT", "titles": ["1 TIMOTHEE"]},
     {"livro": "2 Timothée", "osis": "2Tim", "t": "NT", "titles": ["2 TIMOTHEE"]},
     {"livro": "Tite", "osis": "Titus", "t": "NT", "titles": ["TITE"]},
-    {"livro": "Philémon", "osis": "Phlm", "t": "NT", "titles": ["PHILEMON"]},
-    {"livro": "Hébreux", "osis": "Heb", "t": "NT", "titles": ["HEBREUX"]},
+    {
+        "livro": "Philémon",
+        "osis": "Phlm",
+        "t": "NT",
+        "titles": ["PHILEMON"],
+        # OCR EPUB mistura Philémon sob cabeçalho HÉBREUX; âncoras do corpo real
+        "anchors": [
+            "PARTICIPATION A LA FOI SOIT EFFICACE",
+            "DEVENU MON FILS EN PRISON",
+            "DEMANDE DE PAUL",
+        ],
+    },
+    {
+        "livro": "Hébreux",
+        "osis": "Heb",
+        "t": "NT",
+        "titles": ["HEBREUX"],
+        # preferir intro real (após Philémon OCR) em vez do cabeçalho errado 1.11
+        "anchors": ["ECRIT ANONYME"],
+    },
     {"livro": "Jacques", "osis": "Jas", "t": "NT", "titles": ["JACQUES"]},
     {"livro": "1 Pierre", "osis": "1Pet", "t": "NT", "titles": ["1 PIERRE"]},
     {"livro": "2 Pierre", "osis": "2Pet", "t": "NT", "titles": ["2 PIERRE"]},
     {"livro": "1 Jean", "osis": "1John", "t": "NT", "titles": ["1 JEAN"]},
-    {"livro": "2 Jean", "osis": "2John", "t": "NT", "titles": ["2 JEAN"]},
-    {"livro": "3 Jean", "osis": "3John", "t": "NT", "titles": ["3 JEAN"]},
-    {"livro": "Judas", "osis": "Jude", "t": "NT", "titles": ["JUDAS", "JUDE"], "anchors": ["DE LA PART DE JUDE"]},
+    {
+        "livro": "2 Jean",
+        "osis": "2John",
+        "t": "NT",
+        "titles": ["2 JEAN", "2JEAN"],
+        "anchors": ["CHERE DAME", "APPEL A UN AMOUR"],
+    },
+    {
+        "livro": "3 Jean",
+        "osis": "3John",
+        "t": "NT",
+        "titles": ["3 JEAN", "3JEAN"],
+        "anchors": [
+            "TROISIEME EPITRE DE JEAN",
+            "GAIUS DE DERBE",
+            "A L'INSTAR DE 2 JEAN",
+        ],
+        "optional": True,  # EPUB OCR corta quase todo o corpo
+    },
+    {
+        "livro": "Judas",
+        "osis": "Jude",
+        "t": "NT",
+        "titles": ["JUDAS", "JUDE", "IUDE"],
+        "anchors": ["DE LA PART DE JUDE", "EPITRE DE JUDE"],
+    },
     {
         "livro": "Apocalypse",
         "osis": "Rev",
         "t": "NT",
-        "titles": ["APOCALYPSE"],
-        "anchors": ["APOCALYPSE."],
+        "titles": ["APOCALYPSE", "APOCAIMPSE"],
+        "anchors": ["APOCALYPSE.", "REVELATION DE JESUS-CHRIST"],
     },
 ]
 
@@ -142,7 +183,7 @@ EXPECTED_CHAPTERS: dict[str, int] = {
 }
 
 HEADER_RE = re.compile(
-    r"^(.+?)\s+(\d+)[\.:](\d+)\s*$"
+    r"^(.+?)\s+(\d+)[\.:](\d+)(?:\s|$)"
 )
 # Versículo OCR: "2La" / "3«" OU após pontuação ". 4 Dieu" / ": 12 la terre"
 VERSE_SPLIT_RE = re.compile(
@@ -201,7 +242,9 @@ class BookOut:
     chapters: list[Chapter] = field(default_factory=list)
 
 
-def find_book_starts(lines: list[str]) -> list[tuple[dict, int]]:
+def find_book_starts(
+    lines: list[str], start_cursor: int | None = None
+) -> list[tuple[dict, int]]:
     """Encontra início de cada livro em ordem canónica."""
     title_index: dict[str, list[int]] = {}
     for i, line in enumerate(lines):
@@ -210,8 +253,39 @@ def find_book_starts(lines: list[str]) -> list[tuple[dict, int]]:
             continue
         title_index.setdefault(n, []).append(i)
 
+    if start_cursor is None:
+        start_cursor = 0
+        for i, line in enumerate(lines):
+            n = norm(line)
+            # início real: "GENESE Le Livre…" (não TOC curto)
+            if n.startswith("GENESE ") and "LIVRE" in n:
+                start_cursor = i
+                break
+            if n == "GENESE":
+                # confirmar que a seguir há conteúdo, não só índice
+                nxt = norm(lines[i + 1]) if i + 1 < len(lines) else ""
+                if "LIVRE" in nxt or "AU COMMENCEMENT" in nxt or len(nxt) > 80:
+                    start_cursor = i
+                    break
+        else:
+            for i, line in enumerate(lines):
+                if "AU COMMENCEMENT" in norm(line) and "DIEU CREA" in norm(line):
+                    start_cursor = max(0, i - 2)
+                    break
+
     starts: list[tuple[dict, int]] = []
-    cursor = 600  # depois da intro / mapas
+    cursor = start_cursor
+
+    def line_has_book_title(nline: str, tn: str) -> bool:
+        if nline == tn:
+            return True
+        if not nline.startswith(tn + " "):
+            return False
+        rest = nline[len(tn) + 1 :]
+        # cabeçalho corrente "GENESE 2.4 …" — não é início de livro
+        if re.match(r"^\d+[\.:]\d+", rest):
+            return False
+        return True
 
     for bi, book in enumerate(BOOKS):
         found: int | None = None
@@ -226,69 +300,113 @@ def find_book_starts(lines: list[str]) -> list[tuple[dict, int]]:
             if found is not None:
                 break
 
-        # 2) título exacto (linha só com o nome)
+        # 2) título exacto (linha só com o nome) — ignorar TOC curto isolado
         if found is None:
             for title in book["titles"]:
                 tn = norm(title)
                 for i in title_index.get(tn, []):
-                    if i >= cursor:
-                        # evitar "JEAN" no meio de "1 JEAN" already handled by exact
-                        # evitar ACTES curto antes de ACTES DES APOTRES: preferir mais longo
+                    if i < cursor:
+                        continue
+                    # TOC: linha só com o nome e vizinhas também curtas
+                    if len(lines[i].strip()) <= len(title) + 2:
+                        nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+                        if len(nxt) < 40 and not any(
+                            norm(nxt).startswith(norm(t) + " ")
+                            or norm(nxt) == norm(t)
+                            for t in book["titles"]
+                        ):
+                            # possível título real se a linha seguinte for intro longa
+                            if len(nxt) < 20:
+                                continue
+                    found = i
+                    break
+                if found is not None:
+                    break
+
+        # 2b) título no início de linha longa (EPUB OCR)
+        if found is None:
+            # títulos mais longos primeiro
+            for title in sorted(book["titles"], key=len, reverse=True):
+                tn = norm(title)
+                for i in range(cursor, len(lines)):
+                    if line_has_book_title(norm(lines[i]), tn):
                         found = i
                         break
                 if found is not None:
                     break
 
-        # 3) primeiro cabeçalho corrente LIVRE n.m após cursor
+        # 3) primeiro cabeçalho corrente LIVRE n.m após cursor (início ou meio de linha)
         if found is None:
-            for title in book["titles"]:
+            for title in sorted(book["titles"], key=len, reverse=True):
                 tn = norm(title)
+                hdr = re.compile(
+                    rf"(?<![A-Z0-9]){re.escape(tn)}\s+(\d+)[\.:](\d+)"
+                )
                 for i in range(cursor, len(lines)):
-                    m = HEADER_RE.match(lines[i].strip())
+                    n = norm(lines[i])
+                    m = hdr.search(n)
                     if not m:
                         continue
-                    if norm(m.group(1)) == tn:
-                        # recuar um pouco para intro se existir
-                        found = max(cursor, i - 80)
-                        break
+                    # preferir capítulo baixo (início do livro)
+                    ch = int(m.group(1))
+                    if ch > 3 and book["osis"] not in ("Obad", "Phlm", "2John", "3John", "Jude"):
+                        # ainda assim aceitar se for a primeira ocorrência
+                        pass
+                    found = i
+                    break
                 if found is not None:
                     break
 
         if found is None:
+            if book.get("optional"):
+                print(
+                    f"aviso: livro opcional não encontrado: {book['livro']} "
+                    f"(após linha {cursor}) — ignorado"
+                )
+                continue
             raise SystemExit(
                 f"livro não encontrado: {book['livro']} (após linha {cursor})"
             )
 
         # Cantique: preferir "CANTIQUE DES CANTIQUES"
         if book["osis"] == "Song":
-            for i in title_index.get(norm("CANTIQUE DES CANTIQUES"), []):
-                if i >= cursor:
+            for i in range(cursor, len(lines)):
+                if line_has_book_title(norm(lines[i]), norm("CANTIQUE DES CANTIQUES")):
                     found = i
                     break
 
         # Actes: preferir título longo
         if book["osis"] == "Acts":
-            for i in title_index.get(norm("ACTES DES APOTRES"), []):
-                if i >= cursor:
+            for i in range(cursor, len(lines)):
+                n = norm(lines[i])
+                if "ACTES DES APOTRES" in n or line_has_book_title(n, norm("ACTES DES APOTRES")):
                     found = i
                     break
 
-        # Jean (Evangile): não confundir com 1/2/3 Jean — título exacto "JEAN"
-        # já é exact match; garantir que não é depois de Actes
         starts.append((book, found))
-        cursor = found + 3
+        cursor = found + 1
 
     return starts
 
 
-def is_running_header(line: str, book_titles: set[str]) -> bool:
+def parse_header_chapter(line: str, book_titles: set[str]) -> int | None:
+    """Aceita cabeçalho no início ou embutido (EPUB OCR)."""
+    n = norm(line)
+    # títulos longos primeiro
+    for tn in sorted(book_titles, key=len, reverse=True):
+        m = re.search(rf"(?<![A-Z0-9]){re.escape(tn)}\s+(\d+)[\.:](\d+)", n)
+        if m:
+            return int(m.group(1))
     m = HEADER_RE.match(line.strip())
     if not m:
-        return False
-    # rejeitar linhas longas (texto corrido)
-    if len(line.strip()) > 36:
-        return False
-    return norm(m.group(1)) in book_titles
+        return None
+    if norm(m.group(1)) not in book_titles:
+        return None
+    return int(m.group(2))
+
+
+def is_running_header(line: str, book_titles: set[str]) -> bool:
+    return parse_header_chapter(line, book_titles) is not None
 
 
 def is_noise_line(line: str, book_titles: set[str]) -> bool:
@@ -312,15 +430,6 @@ def is_noise_line(line: str, book_titles: set[str]) -> bool:
     return False
 
 
-def parse_header_chapter(line: str, book_titles: set[str]) -> int | None:
-    m = HEADER_RE.match(line.strip())
-    if not m or len(line.strip()) > 36:
-        return None
-    if norm(m.group(1)) not in book_titles:
-        return None
-    return int(m.group(2))
-
-
 def extract_book_body(
     lines: list[str], start: int, end: int, book: dict
 ) -> list[Chapter]:
@@ -332,7 +441,13 @@ def extract_book_body(
     if book["osis"] == "Nah":
         titles.update({norm("NAHUM"), norm("NAHOUM")})
     if book["osis"] == "Jude":
-        titles.update({norm("JUDAS"), norm("JUDE")})
+        titles.update({norm("JUDAS"), norm("JUDE"), norm("IUDE")})
+    if book["osis"] == "2John":
+        titles.update({norm("2 JEAN"), norm("2JEAN")})
+    if book["osis"] == "3John":
+        titles.update({norm("3 JEAN"), norm("3JEAN")})
+    if book["osis"] == "Rev":
+        titles.update({norm("APOCALYPSE"), norm("APOCAIMPSE")})
 
     expected_caps = EXPECTED_CHAPTERS.get(book["osis"], 50)
 

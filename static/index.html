@@ -3,78 +3,115 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#f5f0e8" />
-  <title>Bible Segond 21 — local</title>
+  <meta name="theme-color" content="#f7f8f5" />
+  <title>Bible Segond 21</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <div class="wrap">
-    <header class="site-header">
-      <p class="eyebrow">Lecture locale · hors-ligne</p>
-      <h1 class="site-title">Bible Segond 21</h1>
+  <!-- état interne (YouVersion-like UI) -->
+  <div class="sr-only" aria-hidden="true">
+    <select id="sel-testamento"></select>
+    <select id="sel-livro"></select>
+    <select id="sel-capitulo"></select>
+    <select id="sel-versiculo"></select>
+  </div>
+
+  <div class="app">
+    <header class="topbar">
+      <span class="version-chip" title="Segond 21">S21</span>
+      <button type="button" id="btn-ref" class="ref-pill" aria-haspopup="dialog" aria-controls="sheet-picker">
+        <span id="ref-label">…</span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" id="btn-open-search" class="icon-btn" aria-label="Rechercher" aria-controls="sheet-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
     </header>
 
-    <section class="nav-bar" aria-label="Navigation">
-      <div class="nav-grid">
-        <label class="field">
-          <span>Testament</span>
-          <select id="sel-testamento" autocomplete="off"></select>
-        </label>
-        <label class="field">
-          <span>Livre</span>
-          <select id="sel-livro" autocomplete="off"></select>
-        </label>
-        <label class="field">
-          <span>Chapitre</span>
-          <select id="sel-capitulo" autocomplete="off"></select>
-        </label>
-        <label class="field">
-          <span>Verset</span>
-          <select id="sel-versiculo" autocomplete="off"></select>
-        </label>
-      </div>
-    </section>
+    <main class="reader" aria-label="Lecture" aria-busy="false">
+      <div id="versiculos" class="verse-list"></div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </main>
 
-    <section class="search-block" aria-label="Recherche">
+    <nav class="dock" aria-label="Chapitres">
+      <button type="button" id="btn-prev" class="dock-btn" aria-label="Chapitre précédent">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" id="btn-open-verses" class="dock-center" aria-label="Choisir un verset">Versets</button>
+      <button type="button" id="btn-next" class="dock-btn" aria-label="Chapitre suivant">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Picker livre / chapitre -->
+  <div id="sheet-picker" class="sheet" hidden>
+    <button type="button" class="sheet-backdrop" data-close="picker" aria-label="Fermer"></button>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2 id="picker-title">Choisir</h2>
+        <button type="button" class="icon-btn" data-close="picker" aria-label="Fermer">×</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab is-active" data-tab="books" role="tab" aria-selected="true">Livres</button>
+        <button type="button" class="tab" data-tab="chapters" role="tab" aria-selected="false">Chapitres</button>
+      </div>
+      <div id="pane-books" class="pane">
+        <div class="testament-tabs">
+          <button type="button" class="t-tab is-active" data-test="AT">Ancien</button>
+          <button type="button" class="t-tab" data-test="NT">Nouveau</button>
+        </div>
+        <div id="book-list" class="book-list"></div>
+      </div>
+      <div id="pane-chapters" class="pane" hidden>
+        <div id="chapter-grid" class="num-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grille versets -->
+  <div id="sheet-verses" class="sheet" hidden>
+    <button type="button" class="sheet-backdrop" data-close="verses" aria-label="Fermer"></button>
+    <div class="sheet-panel sheet-panel--sm" role="dialog" aria-modal="true" aria-labelledby="verses-title">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2 id="verses-title">Versets</h2>
+        <button type="button" class="icon-btn" data-close="verses" aria-label="Fermer">×</button>
+      </div>
+      <div id="verse-grid" class="num-grid"></div>
+    </div>
+  </div>
+
+  <!-- Recherche -->
+  <div id="sheet-search" class="sheet" hidden>
+    <button type="button" class="sheet-backdrop" data-close="search" aria-label="Fermer"></button>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="search-title">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2 id="search-title">Recherche</h2>
+        <button type="button" class="icon-btn" data-close="search" aria-label="Fermer">×</button>
+      </div>
       <form id="form-busca" class="search-form" role="search">
         <label class="sr-only" for="q">Recherche</label>
         <div class="search-field">
-          <input
-            id="q"
-            type="search"
-            placeholder="Jean 3:16 ou un mot…"
-            autocomplete="off"
-            enterkeyhint="search"
-            spellcheck="true"
-            aria-controls="search-panel"
-            aria-describedby="search-hint"
-          />
-          <button type="button" id="btn-clear-search" class="search-clear" hidden aria-label="Effacer">
-            ×
-          </button>
+          <input id="q" type="search" placeholder="Jean 3:16 ou un mot…" autocomplete="off" enterkeyhint="search" />
+          <button type="button" id="btn-clear-search" class="search-clear" hidden aria-label="Effacer">×</button>
         </div>
-        <button type="submit" id="btn-search">Chercher</button>
+        <button type="submit" id="btn-search">OK</button>
       </form>
       <p id="search-hint" class="search-hint">Référence ou texte (≥ 2 lettres).</p>
       <div id="search-panel" class="search-panel" hidden>
         <div class="search-meta">
           <p id="search-meta" class="search-meta-text" aria-live="polite"></p>
-          <button type="button" id="btn-close-results" class="linkish">Fermer</button>
+          <button type="button" id="btn-close-results" class="linkish">Effacer</button>
         </div>
         <ul id="resultados" role="listbox" aria-label="Résultats"></ul>
       </div>
-    </section>
-
-    <section class="reader" aria-label="Lecture" aria-busy="false">
-      <div class="reader-toolbar">
-        <button type="button" id="btn-prev" class="nav-btn" aria-label="Chapitre précédent">‹</button>
-        <h2 id="titulo-cap" class="chapter-title"></h2>
-        <button type="button" id="btn-next" class="nav-btn" aria-label="Chapitre suivant">›</button>
-      </div>
-      <div id="versiculos" class="verse-list"></div>
-      <p id="status" class="status" role="status" aria-live="polite"></p>
-    </section>
+    </div>
   </div>
+
+  <h2 id="titulo-cap" class="sr-only"></h2>
   <script type="module" src="/static/app.js"></script>
 </body>
 </html>
